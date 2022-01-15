@@ -14,11 +14,16 @@ from sklearn.model_selection import train_test_split
 
 #handle missing data
 def Missing_values(df):
-    #null values
-    print ("summary of null values befor imputing the data: ")
-    print(df.isna().sum())
-    #impute data by mode
-    return df.groupby(['device_width','device_height','device_version']).apply(lambda x: x.fillna(x.mode().iloc[0])).reset_index(drop=True)
+	#null values
+	print ("summary of null values befor imputing missing data: ")
+	print(df.isna().sum())
+	#impute data by mode
+	result =  df.groupby(['device_width','device_height','device_version']).apply(lambda x: x.fillna(x.mode().iloc[0])).reset_index(drop=True)
+	print ("summary of null values after imputing missing data based on device version")
+	print(result.isna().sum())
+	result = result.fillna('Missing')
+	print ("summary of null values after imputing missing data as a seprate category")
+	return result
 
 
 # create new  features
@@ -33,15 +38,15 @@ def Feature_engineering(df):
                  21: "evening", 22: "evening", 23: "evening"}
 
     month_dict = {'Nov': 'fall', 'Oct': 'fall', 'Sep': 'fall',
-                  'Aug': 'summer', 'Sep': 'summer'}
+                  'Jul' : 'summer', 'Aug': 'summer', 'Sep': 'summer'}
     # decive diagonal
-    df.loc[:, 'device_diag'] = np.sqrt(df.device_height ^ 2 * df.device_width ^ 2).round()
+    df.loc[:, 'device_diag'] = np.sqrt(df.device_height ^ 2 + df.device_width ^ 2).round()
     # time instead timestamp
     df.loc[:, 'time'] = pd.to_datetime(df['timestamp'], unit='s')
     # day of the week
     df.loc[:, 'Day_of_Week'] = df['time'].dt.weekday_name
     # month and season
-    df.loc[:, 'Month'] = df['time'].dt.month_name().str[:3].map(month_dict)
+    df.loc[:, 'Month'] = df['time'].dt.month_name().str[:3]#.map(month_dict)
     # hour and day time
     df.loc[:, 'hour'] = df['time'].dt.hour.map(hour_dict)
     # drop time and timestamp
@@ -120,7 +125,7 @@ def cumulatively_categorise_f(column,threshold=0.85,return_categories_list=False
 #Reducing the amount of categories
 def cumulatively_categorise(df,columns):
     for col in columns:
-        df[col] =cumulatively_categorise_f(df[col])
+        df.loc[:,col] =cumulatively_categorise_f(df.loc[:,col])
     return df
 
 
