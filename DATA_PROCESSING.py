@@ -11,18 +11,27 @@ from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
 
+def show_missing_data_stats(df):
+	missing_date_counts = df.isna().sum()
+	print(missing_date_counts[missing_date_counts > 0])
 
 #handle missing data
 def Missing_values(df):
-	#null values
-	print ("summary of null values befor imputing missing data: ")
-	print(df.isna().sum())
+	#check if missing values exist
+	if (df.isna().sum().sum() == 0):
+		return df
+	print ("summary of missing values before imputing missing data: ")
+	show_missing_data_stats(df)
 	#impute data by mode
 	result =  df.groupby(['device_width','device_height','device_version']).apply(lambda x: x.fillna(x.mode().iloc[0])).reset_index(drop=True)
-	print ("summary of null values after imputing missing data based on device version")
-	print(result.isna().sum())
-	result = result.fillna('Missing')
-	print ("summary of null values after imputing missing data as a seprate category")
+	print ("summary of missing values after imputing missing data based on device version")
+	show_missing_data_stats(result)
+	
+	for c in result.loc[:,result.isna().sum() > 0]:
+		result.loc[:,c] = result[c].fillna(f"Missing_{c}")
+	print ("summary of missing values after imputing missing data by assigning a separate category")
+	show_missing_data_stats(result)
+	
 	return result
 
 
@@ -88,7 +97,8 @@ def get_dummies_fun(df, cat_list):
 
 
 
-def cumulatively_categorise_f(column,threshold=0.85,return_categories_list=False):
+def cumulatively_categorise_f(col_name, column,threshold=0.85,return_categories_list=False):
+    other_name = f"{col_name}_other"
   #Find the threshold value using the percentage and number of instances in the column
     threshold_value=int(threshold*len(column))
   #Initialise an empty list for our new minimised categories
@@ -108,14 +118,14 @@ def cumulatively_categorise_f(column,threshold=0.85,return_categories_list=False
         if s>=threshold_value:
             break
   #Append the category Other to the list
-    categories_list.append('Other')
+    categories_list.append(other_name)
 
   #Replace all instances not in our new categories by Other
-    new_column=column.apply(lambda x: x if x in categories_list else 'Other')
+    new_column=column.apply(lambda x: x if x in categories_list else other_name)
 
   #Return transformed column and unique values if return_categories=True
     if(return_categories_list):
-        return new_column,categories_list
+        return new_column,{col_name: categories_list}
   #Return only the transformed column if return_categories=False
     else:
         return new_column
@@ -124,18 +134,24 @@ def cumulatively_categorise_f(column,threshold=0.85,return_categories_list=False
 
 #Reducing the amount of categories
 def cumulatively_categorise(df,columns):
-    for col in columns:
-        df.loc[:,col] =cumulatively_categorise_f(df.loc[:,col])
-    return df
+	cat_dict ={}
+	for col_name in columns:
+		new_col, column_dict = cumulatively_categorise_f(col_name, df.loc[:,col_name], return_categories_list=True)
+		df.loc[:,col_name] = new_col
+		cat_dict = {**cat_dict, **column_dict}
+	return df,cat_dict 
 
 
 # handle imbalanced data
-def Smote_alg(X, y):
+def Smote_alg(X, y, X_cols, y_cols):
+	print ('org X.shape', X.shape, 'len(X_cols)' , len(X_cols))
     # transform the dataset
-    oversample = SMOTE()
-    X, y = oversample.fit_resample(X, y)
-    X = pd.DataFrame(X)
-    y = pd.DataFrame(y)
-    return X, y
+	oversample = SMOTE()
+	new_X, new_y = oversample.fit_resample(X, y)
+	print ('new_X.shape', new_X.shape)
+	new_X_df = pd.DataFrame(new_X, columns = X_cols)
+	new_y_Df = pd.DataFrame(new_y, columns = y_cols)
+
+	return new_X_df, new_y_Df
 
 
